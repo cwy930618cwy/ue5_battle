@@ -7,6 +7,7 @@ public class ue5_battle : ModuleRules
 	public ue5_battle(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		PublicIncludePaths.AddRange(new string[] { ModuleDirectory }); 
 	
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" });
 
