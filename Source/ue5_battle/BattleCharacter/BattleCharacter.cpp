@@ -13,13 +13,22 @@ ABattleCharacter::ABattleCharacter()
 {
     // ========== 1. 加载骨骼网格体（角色模型） ========== //
     static ConstructorHelpers::FObjectFinder<USkeletalMesh> MeshAsset(
-        TEXT("/Game/ThreeCharacters/Characters/Mannequins/Meshes/SKM_Manny")  // 模型资产路径
+        TEXT("/Game/MyResources/Meshes/SKM_Manny")  // 模型资产路径
     );
     if (MeshAsset.Succeeded())  // 检查资产是否加载成功
     {
         GetMesh()->SetSkeletalMesh(MeshAsset.Object);                          // 把模型设置到角色的Mesh组件上
         GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -90.0f));          // 模型下移90，让脚踩在胶囊体底部
         GetMesh()->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));         // 模型旋转-90度，让角色面朝前方
+    }
+
+    // ========== 1.1 加载动画蓝图 ========== //
+    static ConstructorHelpers::FClassFinder<UAnimInstance> AnimBPAsset(
+        TEXT("/Game/MyResources/Animation/ABP_Battle")
+    );
+    if (AnimBPAsset.Succeeded())
+    {
+        GetMesh()->SetAnimInstanceClass(AnimBPAsset.Class);  // 设置动画蓝图
     }
 
     // ========== 2. 创建弹簧臂（摄像机支架） ========== //
