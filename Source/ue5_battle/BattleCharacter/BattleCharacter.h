@@ -24,6 +24,9 @@ public:
     ABattleCharacter(const FObjectInitializer& ObjectInitializer); 
 
     virtual void BeginPlay() override;
+
+    // 在 public 区域，BeginPlay 下面加：
+    virtual void Tick(float DeltaTime) override; 
     
     // 重写输入组件设置函数
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -58,6 +61,6 @@ protected:
     void StartJump();                                  // 开始跳跃
     void StopJump();                                   // 停止跳跃
     void Attack();                                     // 攻击
-    void StartSprint();   // 开始冲刺
-    void StopSprint();    // 停止冲刺 
+    void StartSprint();                                // 开始冲刺
+    void StopSprint();                                 // 停止冲刺 
 };

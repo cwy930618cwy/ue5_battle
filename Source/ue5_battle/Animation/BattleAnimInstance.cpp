@@ -3,6 +3,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "BattleCharacter/BattleCharacter.h"
+#include "Movement/BattleCharacterMovementComponent.h"
 
 void UBattleAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
@@ -28,5 +29,10 @@ void UBattleAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     {
         AttackMontage = BattleChar->GetAttackMontage();
     }
-    bIsAttacking = AttackMontage && Montage_IsPlaying(AttackMontage); 
+    bIsAttacking = AttackMontage && Montage_IsPlaying(AttackMontage);
+
+    if (BattleChar && BattleChar->BattleMovement)
+    {
+        bIsSprintingAnim = BattleChar->BattleMovement->IsSprinting();
+    }
 }

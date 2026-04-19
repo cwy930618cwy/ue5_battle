@@ -27,6 +27,6 @@ public:
   UInputAction* AttackAction;
 
   // 奔跑输入
-  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input Actions")
   TObjectPtr<UInputAction> SprintAction;
 };

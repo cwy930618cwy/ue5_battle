@@ -7,7 +7,8 @@
 #include "EnhancedInputComponent.h"
 #include "Input/BattleInputConfig.h"
 #include "Input/BattleInputActions.h" 
-#include "Animation/BattleAnimInstance.h" 
+#include "Animation/BattleAnimInstance.h"
+#include "InputMappingContext.h" 
 #include "GameFramework/CharacterMovementComponent.h" 
 
 ABattleCharacter::ABattleCharacter(const FObjectInitializer& ObjectInitializer)
@@ -60,6 +61,15 @@ ABattleCharacter::ABattleCharacter(const FObjectInitializer& ObjectInitializer)
     // ========== 5.1 获取自定义移动组件指针 ========== //
     BattleMovement = Cast<UBattleCharacterMovementComponent>(GetCharacterMovement());
 
+    // ========== 5.2 加载 InputMappingContext（C++硬编码路径，避免编辑器值被覆盖） ========== //
+    static ConstructorHelpers::FObjectFinder<UInputMappingContext> IMCAsset(
+        TEXT("/Game/MyResources/Input/IMC_Default")
+    );
+    if (InputConfig && IMCAsset.Succeeded())
+    {
+        InputConfig->InputMappingContext = IMCAsset.Object;
+    } 
+
     // ========== 5. 加载输入配置资产 ========== //
     static ConstructorHelpers::FObjectFinder<UBattleInputConfig> InputConfigAsset(
         TEXT("/Game/MyResources/Input/DA_BattleInputConfig")
@@ -87,6 +97,9 @@ ABattleCharacter::ABattleCharacter(const FObjectInitializer& ObjectInitializer)
     static ConstructorHelpers::FObjectFinder<UInputAction> IA_AttackAsset(
         TEXT("/Game/MyResources/Input/IA_Attack")
     ); 
+    static ConstructorHelpers::FObjectFinder<UInputAction> IA_SprintAsset(
+        TEXT("/Game/MyResources/Input/IA_Sprint")
+    );
     // ========== 8. 加载攻击蒙太奇 ========== //
     static ConstructorHelpers::FObjectFinder<UAnimMontage> AttackMontageAsset(
         TEXT("/Game/MyResources/Animation/AM_Attack")
@@ -104,6 +117,7 @@ ABattleCharacter::ABattleCharacter(const FObjectInitializer& ObjectInitializer)
         if (IA_LookAsset.Succeeded()) InputConfig->InputActions->LookAction = IA_LookAsset.Object;
         if (IA_JumpAsset.Succeeded()) InputConfig->InputActions->JumpAction = IA_JumpAsset.Object;
         if (IA_AttackAsset.Succeeded()) InputConfig->InputActions->AttackAction = IA_AttackAsset.Object;
+        if (IA_SprintAsset.Succeeded()) InputConfig->InputActions->SprintAction = IA_SprintAsset.Object; 
     } 
 
 }
@@ -123,7 +137,19 @@ void ABattleCharacter::BeginPlay()
             UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer());
             if (Subsystem)
             {
-                Subsystem->AddMappingContext(InputConfig->InputMappingContext, 0);
+                if (InputConfig->InputMappingContext)
+                {
+                    Subsystem->AddMappingContext(InputConfig->InputMappingContext, 0);
+                    UE_LOG(LogTemp, Warning, TEXT("=== IMC 加载成功，已添加到输入子系统 ==="));
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Error, TEXT("=== InputMappingContext 是空的！IMC 没加载！ ==="));
+                }
+            }
+            else
+            {
+                UE_LOG(LogTemp, Error, TEXT("=== 无法获取输入子系统！ ==="));
             }
         }
     }
@@ -168,20 +194,6 @@ void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
             &ABattleCharacter::Look
         );
 
-        // 绑定跳跃输入（开始和结束）
-        EnhancedInputComponent->BindAction(
-            InputConfig->InputActions->JumpAction, 
-            ETriggerEvent::Started, 
-            this, 
-            &ABattleCharacter::StartJump
-        );
-        EnhancedInputComponent->BindAction(
-            InputConfig->InputActions->JumpAction, 
-            ETriggerEvent::Completed, 
-            this, 
-            &ABattleCharacter::StopJump
-        );
-
         // 绑定攻击输入
         EnhancedInputComponent->BindAction(
             InputConfig->InputActions->AttackAction, 
@@ -189,10 +201,23 @@ void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
             this, 
             &ABattleCharacter::Attack
         );
+        // 绑定跳跃输入
+        EnhancedInputComponent->BindAction(
+            InputConfig->InputActions->JumpAction,
+            ETriggerEvent::Started,
+            this,
+            &ABattleCharacter::StartJump
+        );
+        EnhancedInputComponent->BindAction(
+            InputConfig->InputActions->JumpAction,
+            ETriggerEvent::Completed,
+            this,
+            &ABattleCharacter::StopJump
+        ); 
         // 绑定冲刺输入（Shift键）
         EnhancedInputComponent->BindAction(
             InputConfig->InputActions->SprintAction,
-            ETriggerEvent::Started,
+            ETriggerEvent::Triggered,
             this,
             &ABattleCharacter::StartSprint
         );
@@ -201,8 +226,14 @@ void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
             ETriggerEvent::Completed,
             this,
             &ABattleCharacter::StopSprint
-        );
+        ); 
     }
+}
+
+// ========== Tick：每帧检测冲刺按键 ========== //
+void ABattleCharacter::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
 }
 
 // ========== 6. 移动输入处理 ========== //
@@ -244,11 +275,16 @@ void ABattleCharacter::Look(const FInputActionValue& Value)
 // ========== 8. 跳跃输入处理 ========== //
 void ABattleCharacter::StartJump()
 {
+    UE_LOG(LogTemp, Warning, TEXT("=== StartJump Called! bIsSprinting=%d, CanJump=%d, IsFalling=%d ==="),
+        BattleMovement ? BattleMovement->IsSprinting() : -1,
+        CanJump(),
+        GetCharacterMovement()->IsFalling());
     Jump();
 }
 
 void ABattleCharacter::StopJump()
 {
+    UE_LOG(LogTemp, Warning, TEXT("=== StopJump Called! ==="));
     StopJumping();
 }
 
@@ -270,7 +306,7 @@ void ABattleCharacter::StartSprint()
 {
     if (BattleMovement)
     {
-        BattleMovement->StartSprint();
+        BattleMovement->StartSprinting();
     }
 }
 
@@ -278,6 +314,6 @@ void ABattleCharacter::StopSprint()
 {
     if (BattleMovement)
     {
-        BattleMovement->StopSprint();
+        BattleMovement->StopSprinting();
     }
 }

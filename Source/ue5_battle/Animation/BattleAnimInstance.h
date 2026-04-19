@@ -28,5 +28,9 @@ protected:
 
     // 是否正在攻击（播放攻击蒙太奇时为true）
     UPROPERTY(BlueprintReadOnly, Category = "Character State")
-    bool bIsAttacking = false; 
+    bool bIsAttacking = false;
+
+    // 是否正在冲刺（动画蓝图里用这个切换冲刺动画）
+    UPROPERTY(BlueprintReadOnly, Category = "Character State")
+    bool bIsSprintingAnim = false;
 };
