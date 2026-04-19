@@ -1,0 +1,572 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第一章：从零搭建战斗角色</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0;line-height:1.7;padding:12px;font-size:15px}
+h1{color:#00d2ff;font-size:22px;text-align:center;padding:16px 0;border-bottom:2px solid #00d2ff}
+h2{color:#ff6b6b;font-size:18px;margin:24px 0 12px;padding:8px 12px;background:#2a2a4a;border-left:4px solid #ff6b6b;border-radius:4px}
+h3{color:#4ecdc4;font-size:16px;margin:16px 0 8px}
+h4{color:#ffd93d;font-size:15px;margin:12px 0 6px}
+p{margin:8px 0}
+pre{background:#0d1117;border:1px solid #333;border-radius:8px;padding:12px;overflow-x:auto;font-size:13px;line-height:1.5;margin:8px 0}
+code{font-family:"Fira Code",Consolas,monospace;color:#79c0ff}
+.warn{background:#3d2b00;border-left:4px solid #ffd93d;padding:10px 12px;margin:10px 0;border-radius:4px;font-size:14px}
+.tip{background:#0d2818;border-left:4px solid #4ecdc4;padding:10px 12px;margin:10px 0;border-radius:4px;font-size:14px}
+.bug{background:#2d0a0a;border-left:4px solid #ff6b6b;padding:10px 12px;margin:10px 0;border-radius:4px;font-size:14px}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+th{background:#2a2a4a;color:#00d2ff;padding:8px 6px;text-align:left;border:1px solid #444}
+td{padding:8px 6px;border:1px solid #333}
+tr:nth-child(even){background:#1e1e3a}
+.toc{background:#2a2a4a;padding:16px;border-radius:8px;margin:16px 0}
+.toc a{color:#79c0ff;text-decoration:none;display:block;padding:4px 0}
+.step{background:#16213e;border:1px solid #333;border-radius:8px;padding:16px;margin:16px 0}
+.file{color:#ffd93d;font-weight:bold}
+.keyword{color:#ff7b72}
+.string{color:#a5d6ff}
+.comment{color:#8b949e}
+.tag{display:inline-block;background:#2a2a4a;color:#4ecdc4;padding:2px 8px;border-radius:12px;font-size:12px;margin:2px}
+</style>
+</head>
+<body>
+<h1>📖 第一章：从零搭建战斗角色</h1>
+<p style="text-align:center;color:#888;font-size:13px">基于实际代码审查 + 踩坑经验 + Lyra参考 | 全程C++教学</p>
+
+<div class="toc">
+<h3>📋 目录</h3>
+<a href="#goal">🎯 第一章目标</a>
+<a href="#s0">Step 0: 修改 Build.cs</a>
+<a href="#s1">Step 1: 创建文件夹结构</a>
+<a href="#s2">Step 2: GameMode</a>
+<a href="#s3">Step 3: BattleCharacter 骨架</a>
+<a href="#s4">Step 4: Input 数据层</a>
+<a href="#s5">Step 5: 输入绑定（移动+视角+跳跃）</a>
+<a href="#s6">Step 6: 动画系统</a>
+<a href="#s7">Step 7: 攻击系统</a>
+<a href="#s8">Step 8: 自定义移动组件+冲刺</a>
+<a href="#s9">Step 9: 已知问题 &amp; 注意事项</a>
+<a href="#summary">📝 核心知识点总结</a>
+</div>
+
+<h2 id="goal">🎯 第一章目标</h2>
+<p>用纯C++搭建一个UE5第三人称角色，能<strong>移动、看、跳跃、攻击、冲刺</strong>，并且有对应的动画表现。</p>
+<p><strong>搭建顺序：</strong>Build.cs → 骨架 → 输入 → 动画 → 冲刺，每一步都编译验证。</p>
+
+<div class="step" id="s0">
+<h2>Step 0：修改 Build.cs ⚠️必须第一步做！</h2>
+<div class="warn">⚠️ 踩坑经验：如果不先加 PublicIncludePaths，后面用子文件夹组织代码时编译会报 <code>fatal error C1083: No such file or directory</code></div>
+
+<h4>0.1 加 include 路径</h4>
+<pre><code>PublicIncludePaths.AddRange(new string[] { ModuleDirectory });</code></pre>
+<p>告诉编译器："我的子文件夹里的头文件也要能被找到"。</p>
+
+<h4>0.2 加模块依赖</h4>
+<pre><code>PublicDependencyModuleNames.AddRange(new string[] { 
+    "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" 
+});</code></pre>
+<p><code>EnhancedInput</code> 是UE5新输入系统的模块，不加后面用增强输入会编译报错。</p>
+
+<h4>完整文件 ue5_battle.Build.cs</h4>
+<pre><code><span class="keyword">using</span> UnrealBuildTool;
+
+<span class="keyword">public class</span> ue5_battle : ModuleRules
+{
+    <span class="keyword">public</span> ue5_battle(ReadOnlyTargetRules Target) : <span class="keyword">base</span>(Target)
+    {
+        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+        PublicIncludePaths.AddRange(<span class="keyword">new</span> string[] { ModuleDirectory });
+        PublicDependencyModuleNames.AddRange(<span class="keyword">new</span> string[] { 
+            <span class="string">"Core"</span>, <span class="string">"CoreUObject"</span>, <span class="string">"Engine"</span>, <span class="string">"InputCore"</span>, <span class="string">"EnhancedInput"</span> 
+        });
+    }
+}</code></pre>
+
+<div class="tip">💡 编译方式三选一：<br>1. <strong>Ctrl+Alt+F11</strong>（最推荐）<br>2. 顶部菜单 工具→编译<br>3. 关闭编辑器重开（最稳妥）</div>
+</div>
+
+<div class="step" id="s1">
+<h2>Step 1：创建文件夹和文件结构</h2>
+<pre><code>Source/ue5_battle/
+├── GameMode/
+│   ├── BattleGameMode.h
+│   └── BattleGameMode.cpp
+├── BattleCharacter/
+│   ├── BattleCharacter.h
+│   └── BattleCharacter.cpp
+├── Input/
+│   ├── BattleInputConfig.h     <span class="comment">← 只有.h，纯数据资产</span>
+│   └── BattleInputActions.h    <span class="comment">← 只有.h，纯数据资产</span>
+├── Animation/
+│   ├── BattleAnimInstance.h
+│   └── BattleAnimInstance.cpp
+└── Movement/
+    ├── BattleCharacterMovementComponent.h
+    └── BattleCharacterMovementComponent.cpp</code></pre>
+<div class="tip">🧠 为什么Input文件夹只有.h没有.cpp？因为 BattleInputConfig 和 BattleInputActions 是纯数据容器（UDataAsset），只需要声明 UPROPERTY 变量，不需要写任何逻辑代码。</div>
+</div>
+
+<div class="step" id="s2">
+<h2>Step 2：GameMode — 游戏的"总导演"</h2>
+<p>GameMode只做一件事：告诉引擎"玩家出生时用哪个角色类"。</p>
+
+<h4>BattleGameMode.h</h4>
+<pre><code><span class="keyword">#pragma once</span>
+<span class="keyword">#include</span> <span class="string">"CoreMinimal.h"</span>
+<span class="keyword">#include</span> <span class="string">"GameFramework/GameModeBase.h"</span>
+<span class="keyword">#include</span> <span class="string">"BattleGameMode.generated.h"</span>
+
+<span class="keyword">UCLASS()</span>
+<span class="keyword">class</span> UE5_BATTLE_API ABattleGameMode : <span class="keyword">public</span> AGameModeBase
+{
+    GENERATED_BODY()
+<span class="keyword">public:</span>
+    ABattleGameMode();
+};</code></pre>
+
+<h4>BattleGameMode.cpp</h4>
+<pre><code><span class="keyword">#include</span> <span class="string">"GameMode/BattleGameMode.h"</span>
+<span class="keyword">#include</span> <span class="string">"BattleCharacter/BattleCharacter.h"</span>
+
+ABattleGameMode::ABattleGameMode()
+{
+    DefaultPawnClass = ABattleCharacter::StaticClass();
+}</code></pre>
+
+<h4>配置 DefaultEngine.ini</h4>
+<pre><code>[/Script/EngineSettings.GameMapsSettings]
+GlobalDefaultGameMode=/Script/ue5_battle.BattleGameMode
+
+[/Script/Engine.InputSettings]
+bEnableLegacyInputSystem=false
+
+[/Script/EnhancedInput.EnhancedInputDeveloperSettings]
+bEnableDefaultMappingContexts=true
+bShouldOnlyTriggerLastActionInChord=true</code></pre>
+</div>
+
+<div class="step" id="s3">
+<h2>Step 3：BattleCharacter 骨架 — 角色本体</h2>
+
+<h4>BattleCharacter.h（骨架版）</h4>
+<pre><code><span class="keyword">#pragma once</span>
+<span class="keyword">#include</span> <span class="string">"CoreMinimal.h"</span>
+<span class="keyword">#include</span> <span class="string">"GameFramework/Character.h"</span>
+<span class="keyword">#include</span> <span class="string">"BattleCharacter.generated.h"</span>
+
+<span class="keyword">class</span> USpringArmComponent;
+<span class="keyword">class</span> UCameraComponent;
+
+<span class="keyword">UCLASS()</span>
+<span class="keyword">class</span> UE5_BATTLE_API ABattleCharacter : <span class="keyword">public</span> ACharacter
+{
+    GENERATED_BODY()
+<span class="keyword">public:</span>
+    ABattleCharacter();
+    <span class="keyword">virtual void</span> BeginPlay() <span class="keyword">override</span>;
+    <span class="keyword">virtual void</span> SetupPlayerInputComponent(<span class="keyword">class</span> UInputComponent* PlayerInputComponent) <span class="keyword">override</span>;
+
+<span class="keyword">protected:</span>
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
+    USpringArmComponent* CameraBoom;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
+    UCameraComponent* FollowCamera;
+};</code></pre>
+
+<h4>BattleCharacter.cpp 构造函数</h4>
+<pre><code>ABattleCharacter::ABattleCharacter()
+{
+    <span class="comment">// 1. 加载骨骼网格体</span>
+    <span class="keyword">static</span> ConstructorHelpers::FObjectFinder&lt;USkeletalMesh&gt; MeshAsset(
+        TEXT(<span class="string">"/Game/MyResources/Meshes/SKM_Manny"</span>));
+    <span class="keyword">if</span> (MeshAsset.Succeeded())
+    {
+        GetMesh()-&gt;SetSkeletalMesh(MeshAsset.Object);
+        GetMesh()-&gt;SetRelativeLocation(FVector(0.f, 0.f, -90.f));
+        GetMesh()-&gt;SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+    }
+
+    <span class="comment">// 2. 创建弹簧臂</span>
+    CameraBoom = CreateDefaultSubobject&lt;USpringArmComponent&gt;(TEXT(<span class="string">"CameraBoom"</span>));
+    CameraBoom-&gt;SetupAttachment(RootComponent);
+    CameraBoom-&gt;TargetArmLength = 300.0f;
+    CameraBoom-&gt;bUsePawnControlRotation = <span class="keyword">true</span>;
+
+    <span class="comment">// 3. 创建跟随摄像机</span>
+    FollowCamera = CreateDefaultSubobject&lt;UCameraComponent&gt;(TEXT(<span class="string">"FollowCamera"</span>));
+    FollowCamera-&gt;SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+
+    <span class="comment">// 4. 角色旋转设置（朝向由移动方向决定）</span>
+    bUseControllerRotationPitch = <span class="keyword">false</span>;
+    bUseControllerRotationYaw = <span class="keyword">false</span>;
+    bUseControllerRotationRoll = <span class="keyword">false</span>;
+
+    <span class="comment">// 5. 移动组件参数</span>
+    GetCharacterMovement()-&gt;bOrientRotationToMovement = <span class="keyword">true</span>;
+    GetCharacterMovement()-&gt;RotationRate = FRotator(0.f, 500.f, 0.f);
+    GetCharacterMovement()-&gt;MaxWalkSpeed = 500.0f;
+    GetCharacterMovement()-&gt;JumpZVelocity = 700.0f;
+    GetCharacterMovement()-&gt;AirControl = 0.35f;
+}</code></pre>
+
+<div class="warn">⚠️ .h里声明的变量名叫 CameraBoom，.cpp里就必须用一模一样的名字，不能写成 SpringArm，否则编译报错 error C2065。</div>
+</div>
+
+<div class="step" id="s4">
+<h2>Step 4：Input 数据层 — 输入系统的"数据容器"</h2>
+
+<h4>BattleInputActions.h — 输入动作集合</h4>
+<pre><code><span class="keyword">UCLASS()</span>
+<span class="keyword">class</span> UE5_BATTLE_API UBattleInputActions : <span class="keyword">public</span> UDataAsset
+{
+    GENERATED_BODY()
+<span class="keyword">public:</span>
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    UInputAction* MoveAction;       <span class="comment">// WASD 移动</span>
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    UInputAction* LookAction;       <span class="comment">// 鼠标视角</span>
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    UInputAction* JumpAction;       <span class="comment">// 空格跳跃</span>
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    UInputAction* AttackAction;     <span class="comment">// 鼠标左键攻击</span>
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TObjectPtr&lt;UInputAction&gt; SprintAction; <span class="comment">// Shift冲刺</span>
+};</code></pre>
+
+<h4>BattleInputConfig.h — 输入配置总管</h4>
+<pre><code><span class="keyword">UCLASS()</span>
+<span class="keyword">class</span> UE5_BATTLE_API UBattleInputConfig : <span class="keyword">public</span> UDataAsset
+{
+    GENERATED_BODY()
+<span class="keyword">public:</span>
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    UInputMappingContext* InputMappingContext; <span class="comment">// 按键映射表</span>
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    UBattleInputActions* InputActions;        <span class="comment">// 输入动作集合</span>
+};</code></pre>
+
+<h4>编辑器必须创建的资产</h4>
+<table>
+<tr><th>资产</th><th>类型</th><th>路径</th></tr>
+<tr><td>IMC_Default</td><td>Input Mapping Context</td><td>/Game/MyResources/Input/</td></tr>
+<tr><td>IA_Move</td><td>Input Action (Axis2D)</td><td>/Game/MyResources/Input/</td></tr>
+<tr><td>IA_Look</td><td>Input Action (Axis2D)</td><td>/Game/MyResources/Input/</td></tr>
+<tr><td>IA_Jump</td><td>Input Action (Digital)</td><td>/Game/MyResources/Input/</td></tr>
+<tr><td>IA_Attack</td><td>Input Action (Digital)</td><td>/Game/MyResources/Input/</td></tr>
+<tr><td>IA_Sprint</td><td>Input Action (Digital)</td><td>/Game/MyResources/Input/</td></tr>
+<tr><td>DA_BattleInputConfig</td><td>BattleInputConfig</td><td>/Game/MyResources/Input/</td></tr>
+<tr><td>DA_BattleInputActions</td><td>BattleInputActions</td><td>/Game/MyResources/Input/</td></tr>
+</table>
+
+<h4>IMC_Default 按键映射</h4>
+<table>
+<tr><th>InputAction</th><th>按键</th><th>Modifiers</th></tr>
+<tr><td>IA_Move</td><td>W/A/S/D</td><td>Swizzle(W/S)</td></tr>
+<tr><td>IA_Look</td><td>Mouse XY</td><td>—</td></tr>
+<tr><td>IA_Jump</td><td>Space Bar</td><td>—</td></tr>
+<tr><td>IA_Attack</td><td>Left Mouse</td><td>—</td></tr>
+<tr><td>IA_Sprint</td><td>Left Shift</td><td>—</td></tr>
+</table>
+
+<div class="warn">⚠️ 关键配置：IA_Sprint 和 IA_Jump 的 <strong>Triggers（触发器）数组必须清空</strong>，不要加任何触发器！默认行为就是"按住持续触发Triggered，松开触发Completed"。如果加了Down触发器，冲刺会只触发一次就停。</div>
+</div>
+
+<div class="step" id="s5">
+<h2>Step 5：输入绑定 — 让角色动起来</h2>
+
+<div class="warn">⚠️ 踩坑经验（加载顺序）：构造函数里必须<strong>先加载 DA_BattleInputConfig（得到InputConfig）</strong>，再加载 IMC_Default 赋值。如果顺序反了，InputConfig还是nullptr，赋值会失败！</div>
+
+<h4>构造函数加载资产（正确顺序）</h4>
+<pre><code><span class="comment">// 先加载 InputConfig（必须先！）</span>
+<span class="keyword">static</span> ConstructorHelpers::FObjectFinder&lt;UBattleInputConfig&gt; InputConfigAsset(
+    TEXT(<span class="string">"/Game/MyResources/Input/DA_BattleInputConfig"</span>));
+<span class="keyword">if</span> (InputConfigAsset.Succeeded())
+    InputConfig = InputConfigAsset.Object;
+
+<span class="comment">// 再加载 IMC（InputConfig已有值才能赋值）</span>
+<span class="keyword">static</span> ConstructorHelpers::FObjectFinder&lt;UInputMappingContext&gt; IMCAsset(
+    TEXT(<span class="string">"/Game/MyResources/Input/IMC_Default"</span>));
+<span class="keyword">if</span> (InputConfig &amp;&amp; IMCAsset.Succeeded())
+    InputConfig-&gt;InputMappingContext = IMCAsset.Object;
+
+<span class="comment">// 加载各个 InputAction 并赋值...</span></code></pre>
+
+<h4>BeginPlay — 注册 IMC</h4>
+<pre><code><span class="keyword">void</span> ABattleCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+    APlayerController* PC = Cast&lt;APlayerController&gt;(Controller);
+    <span class="keyword">if</span> (PC &amp;&amp; InputConfig)
+    {
+        <span class="keyword">auto</span>* Subsystem = ULocalPlayer::GetSubsystem
+            &lt;UEnhancedInputLocalPlayerSubsystem&gt;(PC-&gt;GetLocalPlayer());
+        <span class="keyword">if</span> (Subsystem &amp;&amp; InputConfig-&gt;InputMappingContext)
+            Subsystem-&gt;AddMappingContext(InputConfig-&gt;InputMappingContext, 0);
+    }
+}</code></pre>
+
+<h4>SetupPlayerInputComponent — 绑定输入</h4>
+<pre><code>UEnhancedInputComponent* EIC = Cast&lt;UEnhancedInputComponent&gt;(PlayerInputComponent);
+
+<span class="comment">// 移动（持续触发）</span>
+EIC-&gt;BindAction(InputConfig-&gt;InputActions-&gt;MoveAction,
+    ETriggerEvent::Triggered, <span class="keyword">this</span>, &amp;ABattleCharacter::Move);
+<span class="comment">// 视角（持续触发）</span>
+EIC-&gt;BindAction(InputConfig-&gt;InputActions-&gt;LookAction,
+    ETriggerEvent::Triggered, <span class="keyword">this</span>, &amp;ABattleCharacter::Look);
+<span class="comment">// 跳跃（按下+松开）</span>
+EIC-&gt;BindAction(InputConfig-&gt;InputActions-&gt;JumpAction,
+    ETriggerEvent::Started, <span class="keyword">this</span>, &amp;ABattleCharacter::StartJump);
+EIC-&gt;BindAction(InputConfig-&gt;InputActions-&gt;JumpAction,
+    ETriggerEvent::Completed, <span class="keyword">this</span>, &amp;ABattleCharacter::StopJump);</code></pre>
+
+<h4>输入处理函数</h4>
+<pre><code><span class="keyword">void</span> ABattleCharacter::Move(<span class="keyword">const</span> FInputActionValue&amp; Value)
+{
+    FVector2D MovementVector = Value.Get&lt;FVector2D&gt;();
+    <span class="keyword">if</span> (Controller &amp;&amp; MovementVector.SizeSquared() &gt; 0.0f)
+    {
+        <span class="keyword">const</span> FRotator Rotation = Controller-&gt;GetControlRotation();
+        <span class="keyword">const</span> FRotator YawRotation(0, Rotation.Yaw, 0);
+        <span class="keyword">const</span> FVector Forward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+        <span class="keyword">const</span> FVector Right = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+        AddMovementInput(Forward, MovementVector.Y);
+        AddMovementInput(Right, MovementVector.X);
+    }
+}
+
+<span class="keyword">void</span> ABattleCharacter::Look(<span class="keyword">const</span> FInputActionValue&amp; Value)
+{
+    FVector2D LookVector = Value.Get&lt;FVector2D&gt;();
+    <span class="keyword">if</span> (Controller)
+    {
+        AddControllerYawInput(LookVector.X);
+        AddControllerPitchInput(LookVector.Y);
+    }
+}
+
+<span class="keyword">void</span> ABattleCharacter::StartJump() { Jump(); }
+<span class="keyword">void</span> ABattleCharacter::StopJump()  { StopJumping(); }</code></pre>
+</div>
+
+<div class="step" id="s6">
+<h2>Step 6：动画系统 — 让角色有动画表现</h2>
+
+<h4>BattleAnimInstance.h</h4>
+<pre><code><span class="keyword">UCLASS()</span>
+<span class="keyword">class</span> UE5_BATTLE_API UBattleAnimInstance : <span class="keyword">public</span> UAnimInstance
+{
+    GENERATED_BODY()
+<span class="keyword">public:</span>
+    <span class="keyword">virtual void</span> NativeUpdateAnimation(<span class="keyword">float</span> DeltaSeconds) <span class="keyword">override</span>;
+<span class="keyword">protected:</span>
+    UPROPERTY(BlueprintReadOnly) <span class="keyword">float</span> Speed = 0.0f;
+    UPROPERTY(BlueprintReadOnly) <span class="keyword">bool</span> bIsInAir = <span class="keyword">false</span>;
+    UPROPERTY(BlueprintReadOnly) <span class="keyword">bool</span> bIsMoving = <span class="keyword">false</span>;
+    UPROPERTY(BlueprintReadOnly) <span class="keyword">bool</span> bIsAttacking = <span class="keyword">false</span>;
+    UPROPERTY(BlueprintReadOnly) <span class="keyword">bool</span> bIsSprintingAnim = <span class="keyword">false</span>;
+};</code></pre>
+
+<h4>BattleAnimInstance.cpp</h4>
+<pre><code><span class="keyword">void</span> UBattleAnimInstance::NativeUpdateAnimation(<span class="keyword">float</span> DeltaSeconds)
+{
+    Super::NativeUpdateAnimation(DeltaSeconds);
+    ACharacter* Character = Cast&lt;ACharacter&gt;(GetOwningActor());
+    <span class="keyword">if</span> (!Character) <span class="keyword">return</span>;
+    
+    <span class="keyword">auto</span>* MoveComp = Character-&gt;GetCharacterMovement();
+    <span class="keyword">if</span> (!MoveComp) <span class="keyword">return</span>;
+
+    Speed = Character-&gt;GetVelocity().Size();
+    bIsInAir = MoveComp-&gt;IsFalling();
+    bIsMoving = Speed &gt; 3.0f;
+
+    ABattleCharacter* BattleChar = Cast&lt;ABattleCharacter&gt;(Character);
+    <span class="keyword">if</span> (BattleChar)
+    {
+        <span class="keyword">auto</span>* Montage = BattleChar-&gt;GetAttackMontage();
+        bIsAttacking = Montage &amp;&amp; Montage_IsPlaying(Montage);
+        <span class="keyword">if</span> (BattleChar-&gt;BattleMovement)
+            bIsSprintingAnim = BattleChar-&gt;BattleMovement-&gt;IsSprinting();
+    }
+}</code></pre>
+
+<h4>构造函数加载动画蓝图</h4>
+<pre><code><span class="keyword">static</span> ConstructorHelpers::FClassFinder&lt;UAnimInstance&gt; AnimBPAsset(
+    TEXT(<span class="string">"/Game/MyResources/Animation/ABP_Battle"</span>));
+<span class="keyword">if</span> (AnimBPAsset.Succeeded())
+    GetMesh()-&gt;SetAnimInstanceClass(AnimBPAsset.Class);</code></pre>
+
+<h4>编辑器操作：创建动画蓝图 ABP_Battle</h4>
+<p>1. 右键 → Animation → Animation Blueprint → 选择 UBattleAnimInstance 作为父类</p>
+<p>2. AnimGraph 里创建状态机（Idle/Walk/Run/Jump 状态切换）</p>
+<div class="warn">⚠️ 关键：AnimGraph 里必须有 <strong>DefaultSlot</strong> 节点，连在状态机和 Output Pose 之间，否则蒙太奇播放无效果！</div>
+</div>
+
+<div class="step" id="s7">
+<h2>Step 7：攻击系统 — 蒙太奇播放</h2>
+
+<h4>BattleCharacter.h 新增</h4>
+<pre><code><span class="comment">// public:</span>
+UAnimMontage* GetAttackMontage() <span class="keyword">const</span> { <span class="keyword">return</span> AttackMontage; }
+
+<span class="comment">// protected:</span>
+UPROPERTY(EditDefaultsOnly, Category = <span class="string">"Animation"</span>)
+TObjectPtr&lt;UAnimMontage&gt; AttackMontage;
+<span class="keyword">void</span> Attack();</code></pre>
+
+<h4>构造函数加载蒙太奇</h4>
+<pre><code><span class="keyword">static</span> ConstructorHelpers::FObjectFinder&lt;UAnimMontage&gt; AttackMontageAsset(
+    TEXT(<span class="string">"/Game/MyResources/Animation/AM_Attack"</span>));
+<span class="keyword">if</span> (AttackMontageAsset.Succeeded())
+    AttackMontage = AttackMontageAsset.Object;</code></pre>
+
+<h4>绑定 + 实现</h4>
+<pre><code><span class="comment">// 绑定</span>
+EIC-&gt;BindAction(InputConfig-&gt;InputActions-&gt;AttackAction,
+    ETriggerEvent::Started, <span class="keyword">this</span>, &amp;ABattleCharacter::Attack);
+
+<span class="comment">// 实现</span>
+<span class="keyword">void</span> ABattleCharacter::Attack()
+{
+    <span class="keyword">if</span> (AttackMontage)
+    {
+        UAnimInstance* AnimInstance = GetMesh()-&gt;GetAnimInstance();
+        <span class="keyword">if</span> (AnimInstance &amp;&amp; !AnimInstance-&gt;Montage_IsPlaying(AttackMontage))
+            AnimInstance-&gt;Montage_Play(AttackMontage, 1.0f);
+    }
+}</code></pre>
+</div>
+
+<div class="step" id="s8">
+<h2>Step 8：自定义移动组件 + 冲刺 ⚠️重点难点</h2>
+
+<h4>BattleCharacterMovementComponent.h</h4>
+<pre><code><span class="keyword">UCLASS()</span>
+<span class="keyword">class</span> UE5_BATTLE_API UBattleCharacterMovementComponent 
+    : <span class="keyword">public</span> UCharacterMovementComponent
+{
+    GENERATED_BODY()
+<span class="keyword">public:</span>
+    UBattleCharacterMovementComponent();
+    <span class="keyword">void</span> SetWantsToSprint(<span class="keyword">bool</span> bSprint);
+    <span class="keyword">bool</span> IsSprinting() <span class="keyword">const</span> { <span class="keyword">return</span> bIsSprinting; }
+    <span class="keyword">void</span> StartSprinting();
+    <span class="keyword">void</span> StopSprinting();
+    <span class="keyword">virtual void</span> TickComponent(<span class="keyword">float</span> DeltaTime, ELevelTick TickType,
+        FActorComponentTickFunction* ThisTickFunction) <span class="keyword">override</span>;
+<span class="keyword">private:</span>
+    <span class="keyword">float</span> WalkSpeed = 500.0f;
+    <span class="keyword">float</span> SprintSpeed = 900.0f;
+    <span class="keyword">bool</span> bWantsToSprint = <span class="keyword">false</span>;
+    <span class="keyword">bool</span> bIsSprinting = <span class="keyword">false</span>;
+};</code></pre>
+
+<h4>BattleCharacterMovementComponent.cpp</h4>
+<pre><code>UBattleCharacterMovementComponent::UBattleCharacterMovementComponent()
+{
+    MaxWalkSpeed = WalkSpeed;
+    MaxAcceleration = 2048.0f;
+    GroundFriction = 8.0f;
+    BrakingDecelerationWalking = 2048.0f;
+}
+
+<span class="keyword">void</span> UBattleCharacterMovementComponent::TickComponent(...)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    <span class="keyword">if</span> (bWantsToSprint) {
+        bIsSprinting = <span class="keyword">true</span>;
+        MaxWalkSpeed = SprintSpeed;
+    } <span class="keyword">else</span> {
+        bIsSprinting = <span class="keyword">false</span>;
+        MaxWalkSpeed = WalkSpeed;
+    }
+}
+
+<span class="keyword">void</span> ...::StartSprinting() { SetWantsToSprint(<span class="keyword">true</span>); }
+<span class="keyword">void</span> ...::StopSprinting()  { SetWantsToSprint(<span class="keyword">false</span>); }</code></pre>
+
+<h4>替换默认移动组件（⚠️关键写法）</h4>
+<div class="warn">⚠️ 踩坑经验：必须用 FObjectInitializer 在构造函数里替换！父类 ACharacter 在构造函数执行前就已经创建了默认移动组件，只有通过 ObjectInitializer 才能在创建前拦截并替换。参考 Lyra 的 ALyraCharacter 写法。</div>
+
+<pre><code><span class="comment">// .h 改构造函数签名</span>
+ABattleCharacter(<span class="keyword">const</span> FObjectInitializer&amp; ObjectInitializer);
+
+<span class="comment">// .cpp</span>
+ABattleCharacter::ABattleCharacter(<span class="keyword">const</span> FObjectInitializer&amp; ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass
+        &lt;UBattleCharacterMovementComponent&gt;(
+            ACharacter::CharacterMovementComponentName))
+{
+    <span class="comment">// ... 原有代码 ...</span>
+    BattleMovement = Cast&lt;UBattleCharacterMovementComponent&gt;(
+        GetCharacterMovement());
+}</code></pre>
+
+<h4>绑定冲刺输入</h4>
+<pre><code><span class="comment">// 冲刺（持续触发 + 松开）</span>
+EIC-&gt;BindAction(InputConfig-&gt;InputActions-&gt;SprintAction,
+    ETriggerEvent::Triggered, <span class="keyword">this</span>, &amp;ABattleCharacter::StartSprint);
+EIC-&gt;BindAction(InputConfig-&gt;InputActions-&gt;SprintAction,
+    ETriggerEvent::Completed, <span class="keyword">this</span>, &amp;ABattleCharacter::StopSprint);
+
+<span class="keyword">void</span> ABattleCharacter::StartSprint()
+{
+    <span class="keyword">if</span> (BattleMovement) BattleMovement-&gt;StartSprinting();
+}
+<span class="keyword">void</span> ABattleCharacter::StopSprint()
+{
+    <span class="keyword">if</span> (BattleMovement) BattleMovement-&gt;StopSprinting();
+}</code></pre>
+</div>
+
+<div class="step" id="s9">
+<h2>Step 9：已知问题 &amp; 注意事项</h2>
+
+<h3>🐛 已知 Bug</h3>
+<table>
+<tr><th>#</th><th>Bug</th><th>原因</th></tr>
+<tr><td>1</td><td>构造函数中IMC加载顺序错误</td><td>IMC加载代码放在InputConfig赋值之前，if(InputConfig&&...)永远false</td></tr>
+<tr><td>2</td><td>构造函数修改共享DataAsset</td><td>会污染原始资产，教学项目单实例不影响</td></tr>
+<tr><td>3</td><td>冲刺时跳跃不触发（已修复）</td><td>混用IsInputKeyDown和增强输入导致按键被吞</td></tr>
+</table>
+
+<h3>⚠️ 编辑器必做配置清单</h3>
+<table>
+<tr><th>配置项</th><th>说明</th></tr>
+<tr><td>IA_Sprint 触发器清空</td><td>不加任何Trigger，默认按住持续触发</td></tr>
+<tr><td>IA_Jump 触发器清空</td><td>同上</td></tr>
+<tr><td>动画蓝图加 DefaultSlot</td><td>否则蒙太奇播放无效果</td></tr>
+<tr><td>IMC_Default 5个IA都映射好</td><td>否则对应功能不生效</td></tr>
+</table>
+</div>
+
+<div class="step" id="summary">
+<h2>📝 核心知识点总结</h2>
+<table>
+<tr><th>#</th><th>知识点</th><th>步骤</th></tr>
+<tr><td>1</td><td>Build.cs 模块依赖 + include路径</td><td>Step 0</td></tr>
+<tr><td>2</td><td>GameMode 指定默认角色 + ini配置</td><td>Step 2</td></tr>
+<tr><td>3</td><td>Character 组件组合（Mesh+弹簧臂+摄像机）</td><td>Step 3</td></tr>
+<tr><td>4</td><td>FObjectFinder / FClassFinder 加载资产</td><td>Step 3/5/7</td></tr>
+<tr><td>5</td><td>DataAsset 数据资产的用法</td><td>Step 4</td></tr>
+<tr><td>6</td><td>Enhanced Input 三件套（IMC+IA+BindAction）</td><td>Step 5</td></tr>
+<tr><td>7</td><td>触发方式区别（Started/Triggered/Completed）</td><td>Step 5/8</td></tr>
+<tr><td>8</td><td>AnimInstance 每帧同步状态到动画蓝图</td><td>Step 6</td></tr>
+<tr><td>9</td><td>蒙太奇（Montage）+ DefaultSlot</td><td>Step 7</td></tr>
+<tr><td>10</td><td>ObjectInitializer 替换默认组件</td><td>Step 8</td></tr>
+</table>
+
+<div style="text-align:center;margin:24px 0;padding:16px;background:#2a2a4a;border-radius:8px">
+<h3 style="color:#00d2ff">🧩 一句话总结</h3>
+<p style="font-size:16px;color:#ffd93d"><strong>第一章 = 一个能走、能看、能跳、能打、能跑的第三人称角色</strong></p>
+<p>用纯C++搭建了 GameMode → Character → Input → Animation → Movement 五大模块的基础骨架。</p>
+<p>正确的搭建顺序是：<strong>先改Build.cs → 再建骨架 → 再加输入 → 再加动画 → 最后加冲刺</strong>，每一步都编译验证。</p>
+</div>
+</div>
+
+</body>
+</html>
