@@ -7,9 +7,12 @@
 #include "EnhancedInputComponent.h"
 #include "Input/BattleInputConfig.h"
 #include "Input/BattleInputActions.h" 
+#include "Animation/BattleAnimInstance.h" 
 #include "GameFramework/CharacterMovementComponent.h" 
 
-ABattleCharacter::ABattleCharacter()
+ABattleCharacter::ABattleCharacter(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UBattleCharacterMovementComponent>(
+        ACharacter::CharacterMovementComponentName)) // 设置默认子对象类
 {
     // ========== 1. 加载骨骼网格体（角色模型） ========== //
     static ConstructorHelpers::FObjectFinder<USkeletalMesh> MeshAsset(
@@ -52,7 +55,10 @@ ABattleCharacter::ABattleCharacter()
     GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);  // 转身速度
     GetCharacterMovement()->MaxWalkSpeed = 500.0f;                         // 最大行走速度
     GetCharacterMovement()->JumpZVelocity = 700.0f;                        // 跳跃高度
-    GetCharacterMovement()->AirControl = 0.35f;                            // 空中控制力 
+    GetCharacterMovement()->AirControl = 0.35f;                            // 空中控制力
+    
+    // ========== 5.1 获取自定义移动组件指针 ========== //
+    BattleMovement = Cast<UBattleCharacterMovementComponent>(GetCharacterMovement());
 
     // ========== 5. 加载输入配置资产 ========== //
     static ConstructorHelpers::FObjectFinder<UBattleInputConfig> InputConfigAsset(
@@ -78,6 +84,17 @@ ABattleCharacter::ABattleCharacter()
     static ConstructorHelpers::FObjectFinder<UInputAction> IA_JumpAsset(
         TEXT("/Game/MyResources/Input/IA_Jump")
     );
+    static ConstructorHelpers::FObjectFinder<UInputAction> IA_AttackAsset(
+        TEXT("/Game/MyResources/Input/IA_Attack")
+    ); 
+    // ========== 8. 加载攻击蒙太奇 ========== //
+    static ConstructorHelpers::FObjectFinder<UAnimMontage> AttackMontageAsset(
+        TEXT("/Game/MyResources/Animation/AM_Attack")
+    );
+    if (AttackMontageAsset.Succeeded())
+    {
+        AttackMontage = AttackMontageAsset.Object;
+    } 
 
     if (InputConfig && InputActionsAsset.Succeeded())
     {
@@ -86,6 +103,7 @@ ABattleCharacter::ABattleCharacter()
         if (IA_MoveAsset.Succeeded()) InputConfig->InputActions->MoveAction = IA_MoveAsset.Object;
         if (IA_LookAsset.Succeeded()) InputConfig->InputActions->LookAction = IA_LookAsset.Object;
         if (IA_JumpAsset.Succeeded()) InputConfig->InputActions->JumpAction = IA_JumpAsset.Object;
+        if (IA_AttackAsset.Succeeded()) InputConfig->InputActions->AttackAction = IA_AttackAsset.Object;
     } 
 
 }
@@ -163,6 +181,27 @@ void ABattleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
             this, 
             &ABattleCharacter::StopJump
         );
+
+        // 绑定攻击输入
+        EnhancedInputComponent->BindAction(
+            InputConfig->InputActions->AttackAction, 
+            ETriggerEvent::Started, 
+            this, 
+            &ABattleCharacter::Attack
+        );
+        // 绑定冲刺输入（Shift键）
+        EnhancedInputComponent->BindAction(
+            InputConfig->InputActions->SprintAction,
+            ETriggerEvent::Started,
+            this,
+            &ABattleCharacter::StartSprint
+        );
+        EnhancedInputComponent->BindAction(
+            InputConfig->InputActions->SprintAction,
+            ETriggerEvent::Completed,
+            this,
+            &ABattleCharacter::StopSprint
+        );
     }
 }
 
@@ -211,4 +250,34 @@ void ABattleCharacter::StartJump()
 void ABattleCharacter::StopJump()
 {
     StopJumping();
+}
+
+// ========== 9. 攻击输入处理 ========== //
+void ABattleCharacter::Attack()
+{
+    if (AttackMontage)
+    {
+        UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+        if (AnimInstance && !AnimInstance->Montage_IsPlaying(AttackMontage))
+        {
+            AnimInstance->Montage_Play(AttackMontage, 1.0f);
+        }
+    }
+}
+
+// ========== 10. 冲刺输入处理 ========== //
+void ABattleCharacter::StartSprint()
+{
+    if (BattleMovement)
+    {
+        BattleMovement->StartSprint();
+    }
+}
+
+void ABattleCharacter::StopSprint()
+{
+    if (BattleMovement)
+    {
+        BattleMovement->StopSprint();
+    }
 }

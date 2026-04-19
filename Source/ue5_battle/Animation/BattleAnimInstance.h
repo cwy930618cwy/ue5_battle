@@ -25,4 +25,8 @@ protected:
     // 是否在移动（速度 > 0）
     UPROPERTY(BlueprintReadOnly, Category = "Character State")
     bool bIsMoving = false;
+
+    // 是否正在攻击（播放攻击蒙太奇时为true）
+    UPROPERTY(BlueprintReadOnly, Category = "Character State")
+    bool bIsAttacking = false; 
 };

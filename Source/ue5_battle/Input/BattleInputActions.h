@@ -21,4 +21,12 @@ public:
   // 跳跃输入
   UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input Actions")
   UInputAction* JumpAction;
+
+  // 攻击输入
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input Actions")
+  UInputAction* AttackAction;
+
+  // 奔跑输入
+  UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+  TObjectPtr<UInputAction> SprintAction;
 };

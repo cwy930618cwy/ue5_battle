@@ -2,6 +2,7 @@
 #include "Animation/BattleAnimInstance.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "BattleCharacter/BattleCharacter.h"
 
 void UBattleAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
@@ -19,4 +20,13 @@ void UBattleAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     Speed = Character->GetVelocity().Size();           // 当前速度大小
     bIsInAir = MoveComp->IsFalling();                  // 是否在空中
     bIsMoving = Speed > 3.0f;                          // 速度大于3才算在移动（避免抖动）
+
+    // 判断是否正在播放攻击蒙太奇
+    UAnimMontage* AttackMontage = nullptr;
+    ABattleCharacter* BattleChar = Cast<ABattleCharacter>(Character);
+    if (BattleChar)
+    {
+        AttackMontage = BattleChar->GetAttackMontage();
+    }
+    bIsAttacking = AttackMontage && Montage_IsPlaying(AttackMontage); 
 }
